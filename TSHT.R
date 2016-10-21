@@ -1,29 +1,11 @@
-library(hdi)
-library(Matrix);
-library(glmnet);
-library(flare);
-library(AER)
-source("lasso_inference_double.R")
+### TSHT.R
+### Function: Implements the two-stage hard thresholing
+###           procedure for estimation and inference of 
+###           treatment effects in the presence of invalid IVs
+###           as developed in Guo, Kang, Cai, and Small (2016)             
+### Maintainer: Hyunseung Kang
+### E-mail: hskang@stanford.edu
 
-### Working Example ###
-### n = 500, 10 IVs (3 invalid, 10 relevant)
-library(MASS)
-
-n = 500; L = 10; s = 3
-alpha = c(rep(3,s),rep(0,L-s)); beta = 1; gamma = c(rep(1,L))
-epsilonSigma = matrix(c(1,0.8,0.8,1),2,2)
-Z = matrix(rnorm(n*L),n,L)
-
-epsilon = mvrnorm(n,rep(0,2),epsilonSigma)
-D = Z %*% gamma + epsilon[,1]
-Y = Z %*% alpha + D * beta + epsilon[,2]
-
-# Oracle TSLS estimator
-summary(ivreg(Y ~ D + Z[,1:s] - 1 | Z - 1))
-confint(ivreg(Y ~ D + Z[,1:s] - 1 | Z - 1))[1,]
-
-# Our estimator
-TSHT.ldim(Y,D,Z)
 
 ### TSHT.hdim
 ### Function: Point estimate and CI for treatment effect with invalid IVs ###
@@ -81,35 +63,34 @@ TSHT.hdim <- function(Y,D,Z,X,intercept=TRUE,alpha=0.05,estimator=c("hdi","JM"))
   }
   if(estimator[1] == "JM") {
     pz=ncol(Z)
-	model_Y <- SSLasso(W,Y,intercept,verbose=FALSE)
+    model_Y <- SSLasso(W,Y,intercept,verbose=FALSE)
     model_D = SSLasso(W,D,intercept,verbose=FALSE) 
     # ZIJIAN: How do you estimate this from Javanmard's code? Should we extract the $M$ from InverseLinfinity?
     #covW = t(W) %*% W / n
-	ITT_Y = model_Y$unb.coef[1:(pz)]
-	ITT_D = model_D$unb.coef[1:(pz)]
+    ITT_Y = model_Y$unb.coef[1:(pz)]
+    ITT_D = model_D$unb.coef[1:(pz)]
     if(intercept==TRUE){
     covWinv =(model_D$proj %*% t(model_D$proj)/n)[2:(pz+1),2:(pz+1)]
-	W.whole<-cbind(rep(1,n),W)
-	covW<- t(W.whole)%*%(W.whole)/n
-	resid_Y<-Y-W.whole%*%model_Y$coef
+    W.whole<-cbind(rep(1,n),W)
+    covW<- t(W.whole)%*%(W.whole)/n
+    resid_Y<-Y-W.whole%*%model_Y$coef
     resid_D<-D-W.whole%*%model_D$coef
     Resid<-cbind(resid_Y,resid_D)
     Theta.hat<-t(Resid)%*%Resid/n
     SigmaSqY=Theta.hat[1,1]
-	SigmaSqD=Theta.hat[2,2]
-	SigmaYD =Theta.hat[1,2]
-	}else{
-	covWinv =(model_D$proj %*% t(model_D$proj)/n)[1:(pz),1:(pz)]
-	W.whole<-W
-	covW<- t(W.whole)%*%(W.whole)/n
-	resid_Y<-Y-W.whole%*%model_Y$coef
+    SigmaSqD=Theta.hat[2,2]
+    SigmaYD =Theta.hat[1,2]
+  } else{
+    covWinv =(model_D$proj %*% t(model_D$proj)/n)[1:(pz),1:(pz)]
+    W.whole<-W
+    covW<- t(W.whole)%*%(W.whole)/n
+    resid_Y<-Y-W.whole%*%model_Y$coef
     resid_D<-D-W.whole%*%model_D$coef
     Resid<-cbind(resid_Y,resid_D)
     Theta.hat<-t(Resid)%*%Resid/n
     SigmaSqY=Theta.hat[1,1]
-	SigmaSqD=Theta.hat[2,2]
-	SigmaYD =Theta.hat[1,2]
-	}
+    SigmaSqD=Theta.hat[2,2]
+    SigmaYD =Theta.hat[1,2]
   }
   return(TSHT.summ(ITT_Y = ITT_Y,ITT_D = ITT_D,SigmaSqD = SigmaSqD,SigmaSqY = SigmaSqY,SigmaYD=SigmaYD,covW=covW,covWinv=covWinv,n=n,alpha=alpha))
 }
@@ -239,29 +220,26 @@ TSHT.summ <- function(ITT_Y,ITT_D,SigmaSqD,SigmaSqY,SigmaYD,covW,covWinv,n,weigh
   }
 
   # Vtilde and Aweight
-  #Vtilde = (1:length(ITT_Y))[!(Stilde %in% which(invalidIV.candidate[,jstar] == TRUE))]
   Vtilde = (Stilde)[!(Stilde %in% which(invalidIV.candidate[,jstar] == TRUE))]
-  #Vtilde.complement = (1:length(ITT_Y))[!((1:length(ITT_Y)) %in% Vtilde)]
   if(ncol(covW) < (n/10) & weightedBeta & !missing(covW)) {
-  #if(length(ITT_Y) < n & weightedBeta & !missing(covW)) {
-  ###### HK, I take p<n/10 as low dim. Adel's code is using p<n/2. I am more conservative using n/10.
-  ###### HK, we adjust for everything not in Vtilde, not just Vtilde.complement  
-	Aweight = covW[Vtilde,Vtilde] - 
+    Aweight = covW[Vtilde,Vtilde] - 
               covW[Vtilde,-Vtilde] %*% (solve(covW))[-Vtilde,-Vtilde] %*% covW[-Vtilde,Vtilde]
-	# betaE, standard error, and conf int.
+    
+    ### betaE, standard error, and conf int.
     commonDenom = (t(ITT_D[Vtilde]) %*% Aweight %*% ITT_D[Vtilde])
     betaE = (t(ITT_D[Vtilde]) %*% Aweight %*% ITT_Y[Vtilde]) / commonDenom
     VE = (SigmaSqY + betaE^2 * SigmaSqD - 2*betaE*SigmaYD)/ commonDenom
-    confInt = c(betaE - qnorm(1-0.05/2) * sqrt(VE/n),betaE + qnorm(1-0.05/2) * sqrt(VE/n))
+    confInt = c(betaE - qnorm(1-alpha/2) * sqrt(VE/n),betaE + qnorm(1-alpha/2) * sqrt(VE/n))
     return(list(beta=betaE,se = sqrt(VE/n),ci = confInt,V=Vtilde,S = Stilde))  
   } else {
-  	Aweight = diag(1,length(Vtilde),length(Vtilde))
-	commonDenom = (t(ITT_D[Vtilde]) %*% Aweight %*% ITT_D[Vtilde])
-	### General beta estimator betaG, standard error and 
+    Aweight = diag(1,length(Vtilde),length(Vtilde))
+    commonDenom = (t(ITT_D[Vtilde]) %*% Aweight %*% ITT_D[Vtilde])
+    
+    ### General beta estimator betaG, standard error and 
     betaG = (t(ITT_D[Vtilde]) %*% Aweight %*% ITT_Y[Vtilde]) / commonDenom
     VG = (SigmaSqY + betaG^2 * SigmaSqD - 2*betaG*SigmaYD)*(t(ITT_D[Vtilde]) %*% covWinv[Vtilde,Vtilde]%*%ITT_D[Vtilde])/ (commonDenom)^2
-    confInt = c(betaG - qnorm(1-0.05/2) * sqrt(VG/n),betaG + qnorm(1-0.05/2) * sqrt(VG/n))
-  return(list(beta=betaG,se = sqrt(VG/n),ci = confInt,V=Vtilde,S = Stilde))
+    confInt = c(betaG - qnorm(1-alpha/2) * sqrt(VG/n),betaG + qnorm(1-alpha/2) * sqrt(VG/n))
+    return(list(beta=betaG,se = sqrt(VG/n),ci = confInt,V=Vtilde,S = Stilde))
   }
 }
   
