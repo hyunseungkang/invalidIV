@@ -69,7 +69,7 @@ library(Matrix)
 library(glmnet)
 library(flare)
 
-### n = 100, pz = 100 IVs (s = 3 invalid, 10 relevant)
+### n = 100, pz = 300, IVs (s = 3 invalid, 10 relevant)
 # Y: n by 1 vector of outcomes (must be continuous)
 # D: n by 1 vector of treatments (continuous or discrete)
 # Z: n by pz vector of instruments (continuous or discrete)
@@ -77,7 +77,7 @@ library(flare)
 
 # Create data #
 library(MASS)
-n = 100; L = 100; s = 3; nRelevant = 10
+n = 100; L = 300; s = 3; nRelevant = 10
 alpha = c(rep(3,s),rep(0,L-s)); beta = 1; gamma = c(rep(1,nRelevant),rep(0,L-nRelevant))
 epsilonSigma = matrix(c(1,0.8,0.8,1),2,2)
 Z = matrix(rnorm(n*L),n,L)

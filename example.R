@@ -55,7 +55,7 @@ library(Matrix)
 library(glmnet)
 library(flare)
 
-### n = 100, pz = 100 IVs (s = 3 invalid, 10 relevant)
+### n = 100, pz = 300 IVs (s = 3 invalid, 10 relevant)
 # Y: n by 1 vector of outcomes (must be continuous)
 # D: n by 1 vector of treatments (continuous or discrete)
 # Z: n by pz vector of instruments (continuous or discrete)
