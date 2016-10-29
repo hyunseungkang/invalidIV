@@ -229,6 +229,7 @@ SSLasso <- function (X, y, lambda = NULL, mu = NULL, intercept = TRUE,
     Xb <- X;
   }
   resid.lasso = (y - Xb %*% htheta)
+  sigma.hat <- (1/n)*(t(Xb)%*%Xb);
   
   # Estimation of U (or M in Javanard and Montanari's original paper)
   # Check to see if this is a low dimensional problem
