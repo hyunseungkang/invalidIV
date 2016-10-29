@@ -193,6 +193,7 @@ TSHT.helper <- function(ITT_Y,ITT_D,
   
   # Vtilde and Aweight
   Vtilde = setdiff(Stilde,supppi) #this is a setminus operation with Stilde \setminus supp(Pi)
+  print(Vtilde)
   if((ncol(covW) < (n/10) || weightedBeta) && !missing(covW)) {
     Aweight = covW[Vtilde,Vtilde] - 
               covW[Vtilde,-Vtilde] %*% (solve(covW))[-Vtilde,-Vtilde] %*% covW[-Vtilde,Vtilde]
