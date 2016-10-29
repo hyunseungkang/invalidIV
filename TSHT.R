@@ -203,17 +203,17 @@ TSHT.helper <- function(ITT_Y,ITT_D,
     sigmaSq = SigmaSqY + betaE^2 * SigmaSqD - 2*betaE*SigmaYD
     V = sigmaSq / commonDenom
     confInt = c(betaE - qnorm(1-alpha/2) * sqrt(V/n),betaE + qnorm(1-alpha/2) * sqrt(V/n))
-    return(list(beta=betaE,se = sqrt(VE/n),ci = confInt,V=Vtilde,S = Stilde))  
+    return(list(beta=betaE,se = sqrt(V/n),ci = confInt,V=Vtilde,S = Stilde))  
   } else {
     commonDenom = sum(ITT_D[Vtilde]^2)
     
     ### General beta estimator betaG
     betaG = sum(ITT_D[Vtilde] * ITT_Y[Vtilde]) / commonDenom
     sigmaSq = SigmaSqY + betaG^2 * SigmaSqD - 2*betaG*SigmaYD
-    VG = sigmaSq *
+    V = sigmaSq *
          sum((WUMat[,Vtilde] %*% ITT_D[Vtilde] / sqrt(n))^2) / (commonDenom)^2
-    confInt = c(betaG - qnorm(1-alpha/2) * sqrt(VG/n),betaG + qnorm(1-alpha/2) * sqrt(VG/n))
-    return(list(beta=betaG,se = sqrt(VG/n),ci = confInt,V=Vtilde,S = Stilde))
+    confInt = c(betaG - qnorm(1-alpha/2) * sqrt(V/n),betaG + qnorm(1-alpha/2) * sqrt(V/n))
+    return(list(beta=betaG,se = sqrt(V/n),ci = confInt,V=Vtilde,S = Stilde))
   }
 }
   
