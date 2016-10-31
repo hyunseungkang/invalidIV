@@ -290,6 +290,14 @@ TSHT.helper <- function(ITT_Y,ITT_D,
   
   # First Stage
   Stilde = (1:length(ITT_D))[abs(ITT_D) >= (sqrt(SigmaSqD) * sqrt(colSums(WUMat^2)/n) * sqrt(tuning*log(max(pz,n))/n))]
+  if(length(Stilde) == 0) {
+    print("The IVs are individually weak and TSHT using these IVs will give misleading CIs, SEs, and p-values.")
+    response = readline("Proceed anyway treating all the IVs as strong (yes/no)?: ")
+    if(response == "yes") {
+      Stilde = 1:length(ITT_D)
+      print("Again, please be cautious interpreting the CIs, SEs, and p-values...")
+    }
+  }
   suppgamma = rep(FALSE,length(ITT_D))
   suppgamma[Stilde] = TRUE
   
