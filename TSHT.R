@@ -333,8 +333,16 @@ TSHT.helper <- function(ITT_Y,ITT_D,
   # Vtilde and Aweight
   Vtilde = setdiff(Stilde,supppi) #this is a setminus operation with Stilde \setminus supp(Pi)
   if((ncol(covW) < (n/10) || weightedBeta) && !missing(covW)) {
-    Aweight = covW[Vtilde,Vtilde] - 
-              covW[Vtilde,-Vtilde] %*% (solve(covW))[-Vtilde,-Vtilde] %*% covW[-Vtilde,Vtilde]
+    VtildeComplement = setdiff(1:ncol(covW),Vtilde) #Remember, there can be an intercept in covW and the intercept term
+                                                    #is always the last term of W
+    if(length(VtildeComplement) == 0) {
+      Aweight = covW[Vtilde,Vtilde]
+    } else{
+      Aweight = covW[Vtilde,Vtilde] - 
+                (covW[Vtilde,VtildeComplement,drop=FALSE] %*% 
+                (solve(covW[VtildeComplement,VtildeComplement])) %*% 
+                covW[VtildeComplement,Vtilde,drop=FALSE])
+    }
     commonDenom = (t(ITT_D[Vtilde]) %*% Aweight %*% ITT_D[Vtilde])
     
     ### betaE, standard error, and conf int.
