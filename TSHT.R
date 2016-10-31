@@ -6,6 +6,137 @@
 ### Maintainer: Hyunseung Kang
 ### E-mail: hskang@stanford.edu
 
+### InputCheck
+### FUNCTION: checks the input for TSHT() to make sure they are properly
+###           formatted. This is an alternative to the model.matrix()
+###           command.
+### INPUT: Y, continuous outcome vector (u by 1 vector)
+###        D, continuous or discrete treatment vector (n by 1 vector)
+###        Z, continuous or discrete instrument matrix containing p_z 
+###           instruments (n by p_z matrix)
+###        X, optional continuous or discrete matrix containing p_x 
+###           covariates (n by p_x matrix)
+### OUTPUT: a list containing
+###           Y, a numeric outcome vector (n by 1 vector)
+###           D, a numeric treatment vector (n by 1 vector)
+###           Z, a numeric instrument matrix containing p_z instruments
+###              (n by p_z matrix)
+###           X, a numeric covariate matrix containing p_x
+###              covariates (n by p_x matrix). 
+###              If X is missing, a NULL value is returned.
+InputCheck <- function(Y,D,Z,X) {
+  # Check Y
+  stopifnot(missing(Y),(is.numeric(Y) || is.logical(Y)))
+  if((is.matrix(Y) || is.data.frame(Y)) & ncol(Y) > 1) stop("Y must be a vector!")
+  Y = as.numeric(Y)
+  Y.NAorNANindex = (is.na(Y) | is.nan(Y))
+  
+  # Check D
+  stopifnot(missing(D),(is.numeric(D) || is.logical(D) || is.character(D)))
+  if((is.matrix(D) || is.data.frame(D)) & ncol(D) > 1) stop("D must be a vector!")
+  if(is.character(D) || is.factor(D)) {
+    print("Treatment vector is factor or character-type. 
+          Checking to see if there are only two unique character values.")
+    tempD = factor(D)
+    if(nlevels(tempD) != 2) {
+      stop("There aren't two unique values!")
+    } else{
+      print("There are two unique values. Converting them to a binary vector...")
+      print(paste("--->",levels(tempD)[1],"is assigned 0"))
+      print(paste("--->",levels(tempD)[2],"is assigned 1"))
+      D = as.numeric(tempD) - 1
+    }
+  } 
+  D = as.numeric(D)
+  D.NAorNANindex = (is.na(D) | is.nan(D))
+  
+  if(missing(X)) {
+    return(list(Y =Y,D=D,Z=Z,X=NULL))
+  } else{
+    return(list(Y =Y,D=D,Z=Z,X=X))
+  }
+}
+
+
+### TSHT
+### FUNCTION: Point estimate, SE, and CI for treatment effect with invalid IVs 
+###           with individual-level data using 
+###           two-stage hard thresholding (TSHT)
+### INPUT: Y, continuous outcome vector (u by 1 vector)
+###        D, continuous or discrete treatment vector (n by 1 vector)
+###        Z, continuous or discrete instrument matrix containing p_z 
+###           instruments (n by p_z matrix)
+###        X, optional continuous or discrete matrix containing p_x 
+###           covariates (n by p_x matrix)
+###        intercept, should the intercept term be included? 
+###                   (TRUE/FALSE)
+###        alpha, a numeric value indicating the significance level for 
+###               the confidence interval
+###        tuning, a numeric value tuning parameter for TSHT greater 
+###                than 2
+###        ..., additional arguments to be passed to SSLasso and USolver
+###             in JMCode.r
+### OUTPUT: a list (a) beta (scalar numeric value:
+###                             the estimate of the treatment effect)
+###                (b) se (scalar numeric value:
+###                           the standard error of beta)
+###                (c) p-value (scalar numeric value:
+###                           p-value of no treatment effect for beta)
+###                (d) ci (two dimensional vector, 
+###                           the 1-alpha confidence interval for beta
+###                           with the lower and upper endpoints)
+###                (e) V (numeric vector denoting the set of valid and relevant IVs)
+###                (f) S (numeric vector denoting the set of relevant IVs)
+TSHT <- function(Y,D,Z,X,intercept=TRUE,alpha=0.05,tuning=2.01,...) {
+  # Check and Clean Input Type #
+  # Check Y
+  stopifnot(missing(Y),(is.numeric(Y) || is.logical(Y)))
+  if((is.matrix(Y) || is.data.frame(Y)) & ncol(Y) > 1) stop("Y must be a vector!")
+  Y = as.numeric(Y)
+  
+  # Check D
+  stopifnot(missing(D),(is.numeric(D) || is.logical(D) || is.character(D)))
+  if((is.matrix(D) || is.data.frame(D)) & ncol(D) > 1) stop("D must be a vector!")
+  if(is.character(D) || is.factor(D)) {
+    print("Treatment vector is factor or character-type. 
+          Checking to see if there are only two unique character values.")
+    tempD = factor(D)
+    if(nlevels(tempD) != 2) {
+      stop("There aren't two unique values!")
+    } else{
+      print("There are two unique values. Converting them to a binary vector...")
+      print(paste("--->",levels(tempD)[1],"is assigned 0"))
+      print(paste("--->",levels(tempD)[2],"is assigned 1"))
+      D = as.numeric(tempD) - 1
+    }
+  } 
+  D = as.numeric(D)
+  
+  # Check Z and X. 
+  # Currently, we leverage the model.matrix function. 
+  # While it's slow, it's easier to read and robust towards many use cases
+  if(!missing(X)) {
+    model.matrix(~.,data=data.frame(Y,D,Z,X))[,-1]
+  } else {
+    model.matrix(~.,data=data.frame(Y,D,Z))[,-1]
+  }
+  
+  # All the other argument
+  stopifnot(is.logical(intercept))
+  stopifnot(is.numeric(alpha),length(alpha) != 1,alpha <= 1,alpha >= 0)
+  stopifnot(is.numeric(tuning),length(tuning) != 1, tuning >=2)
+  
+  # Constants
+  n = length(Y); pz=ncol(Z)
+  
+  # Setting Up W Matrix
+  if(missing(X)) {
+    W = Z
+  } else{
+    W = cbind(Z,X)
+  }
+  p = ncol(W)
+}
 
 ### TSHT.hdim
 ### Function: Point estimate and CI for treatment effect with invalid IVs ###
@@ -193,7 +324,6 @@ TSHT.helper <- function(ITT_Y,ITT_D,
   
   # Vtilde and Aweight
   Vtilde = setdiff(Stilde,supppi) #this is a setminus operation with Stilde \setminus supp(Pi)
-  print(Vtilde)
   if((ncol(covW) < (n/10) || weightedBeta) && !missing(covW)) {
     Aweight = covW[Vtilde,Vtilde] - 
               covW[Vtilde,-Vtilde] %*% (solve(covW))[-Vtilde,-Vtilde] %*% covW[-Vtilde,Vtilde]
