@@ -99,17 +99,18 @@ TSHT <- function(Y,D,Z,X,intercept=TRUE,alpha=0.05,tuning=2.01,...) {
 
   # Check Z
   stopifnot(!missing(Z),(is.numeric(Z) || is.logical(Z)),is.matrix(Z))
-  
-  # Check X, if present
+  stopifnot(length(Y) == length(D), length(Y) == nrow(Z))
+
+  # Check X, if present, and dimensionalities
   if(!missing(X)) {
-    stopifnot((is.numeric(X) || is.logical(X)),is.matrix(X))
-  }
+    stopifnot((is.numeric(X) || is.logical(X)),is.matrix(X),nrow(Y) == nrow(X))
+  } 
   
   # All the other argument
   stopifnot(is.logical(intercept))
   stopifnot(is.numeric(alpha),length(alpha) != 1,alpha <= 1,alpha >= 0)
   stopifnot(is.numeric(tuning),length(tuning) != 1, tuning >=2)
-  
+
   # Constants
   n = length(Y); pz=ncol(Z)
   
