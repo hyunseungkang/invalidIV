@@ -62,11 +62,11 @@ InputCheck <- function(Y,D,Z,X) {
 ### FUNCTION: Point estimate, SE, and CI for treatment effect with invalid IVs 
 ###           with individual-level data using 
 ###           two-stage hard thresholding (TSHT)
-### INPUT: Y, continuous outcome vector (u by 1 vector)
-###        D, continuous or discrete treatment vector (n by 1 vector)
-###        Z, continuous or discrete instrument matrix containing p_z 
+### INPUT: Y, continuous, numeric outcome vector (u by 1 vector)
+###        D, continuous or discrete, numeric treatment vector (n by 1 vector)
+###        Z, continuous or discrete, numeric instrument matrix containing p_z 
 ###           instruments (n by p_z matrix)
-###        X, optional continuous or discrete matrix containing p_x 
+###        X, optional continuous or discrete, numeric matrix containing p_x 
 ###           covariates (n by p_x matrix)
 ###        intercept, should the intercept term be included? 
 ###                   (TRUE/FALSE)
@@ -90,35 +90,19 @@ InputCheck <- function(Y,D,Z,X) {
 TSHT <- function(Y,D,Z,X,intercept=TRUE,alpha=0.05,tuning=2.01,...) {
   # Check and Clean Input Type #
   # Check Y
-  stopifnot(missing(Y),(is.numeric(Y) || is.logical(Y)))
-  if((is.matrix(Y) || is.data.frame(Y)) & ncol(Y) > 1) stop("Y must be a vector!")
+  stopifnot(!missing(Y),(is.numeric(Y) || is.logical(Y)),(is.matrix(Y) || is.data.frame(Y)) && ncol(Y) == 1)
   Y = as.numeric(Y)
   
   # Check D
-  stopifnot(missing(D),(is.numeric(D) || is.logical(D) || is.character(D)))
-  if((is.matrix(D) || is.data.frame(D)) & ncol(D) > 1) stop("D must be a vector!")
-  if(is.character(D) || is.factor(D)) {
-    print("Treatment vector is factor or character-type. 
-          Checking to see if there are only two unique character values.")
-    tempD = factor(D)
-    if(nlevels(tempD) != 2) {
-      stop("There aren't two unique values!")
-    } else{
-      print("There are two unique values. Converting them to a binary vector...")
-      print(paste("--->",levels(tempD)[1],"is assigned 0"))
-      print(paste("--->",levels(tempD)[2],"is assigned 1"))
-      D = as.numeric(tempD) - 1
-    }
-  } 
+  stopifnot(!missing(D),(is.numeric(D) || is.logical(D)),(is.matrix(D) || is.data.frame(D)) && ncol(D) == 1)
   D = as.numeric(D)
+
+  # Check Z
+  stopifnot(!missing(Z),(is.numeric(Z) || is.logical(Z)),is.matrix(Z))
   
-  # Check Z and X. 
-  # Currently, we leverage the model.matrix function. 
-  # While it's slow, it's easier to read and robust towards many use cases
+  # Check X, if present
   if(!missing(X)) {
-    model.matrix(~.,data=data.frame(Y,D,Z,X))[,-1]
-  } else {
-    model.matrix(~.,data=data.frame(Y,D,Z))[,-1]
+    stopifnot((is.numeric(X) || is.logical(X)),is.matrix(X))
   }
   
   # All the other argument
