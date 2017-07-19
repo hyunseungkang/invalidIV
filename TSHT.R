@@ -87,7 +87,7 @@ InputCheck <- function(Y,D,Z,X) {
 ###                           with the lower and upper endpoints)
 ###                (e) V (numeric vector denoting the set of valid and relevant IVs)
 ###                (f) S (numeric vector denoting the set of relevant IVs)
-TSHT <- function(Y,D,Z,X,intercept=TRUE,alpha=0.05,tuning=2.01,...) {
+TSHT <- function(Y,D,Z,X,intercept=TRUE,alpha=0.05,tuning=2.01,method=c("OLS","DeLasso"),...) {
   # Check and Clean Input Type #
   # Check Y
   stopifnot(!missing(Y),(is.numeric(Y) || is.logical(Y)),(is.matrix(Y) || is.data.frame(Y)) && ncol(Y) == 1)
@@ -101,26 +101,69 @@ TSHT <- function(Y,D,Z,X,intercept=TRUE,alpha=0.05,tuning=2.01,...) {
   stopifnot(!missing(Z),(is.numeric(Z) || is.logical(Z)),is.matrix(Z))
   stopifnot(length(Y) == length(D), length(Y) == nrow(Z))
 
-  # Check X, if present, and dimensionalities
+  # Check X, if present
   if(!missing(X)) {
     stopifnot((is.numeric(X) || is.logical(X)),is.matrix(X),nrow(Y) == nrow(X))
-  } 
-  
+    W = cbind(Z,X)
+  } else {
+    W = Z
+  }
+
   # All the other argument
   stopifnot(is.logical(intercept))
   stopifnot(is.numeric(alpha),length(alpha) != 1,alpha <= 1,alpha >= 0)
   stopifnot(is.numeric(tuning),length(tuning) != 1, tuning >=2)
+  stopifnot(is.character(method))
 
-  # Constants
+  # Derive Inputs for TSHT
   n = length(Y); pz=ncol(Z)
-  
-  # Setting Up W Matrix
-  if(missing(X)) {
-    W = Z
+  if(method[1] == "OLS") {
+    inputs = TSHT.OLS(Y,D,W,pz,intercept)
   } else{
-    W = cbind(Z,X)
+    inputs = TSHT.DeLasso(Y,D,W,pz,intercept)
   }
-  p = ncol(W)
+
+  return(TSHT.helper(ITT_Y = inputs$ITT_Y,ITT_D = inputs$ITT_D,
+                     SigmaSqD = inputs$SigmaSqD,SigmaSqY = inputs$SigmaSqY,SigmaYD=inputs$SigmaYD,
+                     covW = covW,WUMat = WUMat,
+                     weightedBeta=FALSE,alpha=alpha,tuning=tuning)
+
+}
+
+TSHT.OLS <- function(Y,D,W,pz,intercept=TRUE) {
+  # Include intercept
+  if(intercept) {
+    W = cbind(W,1)
+  } 
+  
+  # Compute covariance of W and W %*% U
+  covW = t(W) %*% W /n
+  WUMat = W %*% (solve(covW))[,1:pz]
+  
+  # First Part (OLS Estimation)
+  qrW = qr(W)
+  ITT_Y = qr.coef(qrW,Y)[1:pz]
+  ITT_D = qr.coef(qrW,D)[1:pz]
+  SigmaSqY = sum(qr.resid(qrW,Y)^2)/n
+  SigmaSqD = sum(qr.resid(qrW,D)^2)/n
+  SigmaYD = sum(qr.resid(qrW,Y) * qr.resid(qrW,D)) / n
+
+  return(list(ITT_Y = ITT_Y,ITT_D = ITT_D,WUMat = WUMat,SigmaSqY = SigmaSqY,SigmaSqD = SigmaSqD,SigmaYD = SigmaYD))
+}
+
+TSHT.DeLasso <- function(Y,D,W,pz,intercept=TRUE) {
+  # Fit Reduced-Form Model for Y and D
+  model_Y <- SSLasso(X=W,y=Y,intercept=intercept,verbose=FALSE)
+  model_D = SSLasso(X=W,y=D,intercept=intercept,verbose=FALSE) 
+  ITT_Y = model_Y$unb.coef[1:(pz)]
+  ITT_D = model_D$unb.coef[1:(pz)]
+  resid_Y = model_Y$resid.lasso; resid_D = model_D$resid.lasso
+  SigmaSqY=sum(resid_Y^2)/n
+  SigmaSqD=sum(resid_D^2)/n
+  SigmaYD =sum(resid_Y * resid_D)/n
+  WUMat = model_D$WUMat
+
+  return(list(ITT_Y = ITT_Y,ITT_D = ITT_D,WUMat = WUMat,SigmaSqY = SigmaSqY,SigmaSqD = SigmaSqD,SigmaYD = SigmaYD))
 }
 
 ### TSHT.hdim
