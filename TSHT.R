@@ -2,9 +2,9 @@
 ### Function: Implements the two-stage hard thresholing
 ###           procedure for estimation and inference of 
 ###           treatment effects in the presence of invalid IVs
-###           as developed in Guo, Kang, Cai, and Small (2017)             
+###           as developed in Guo, Kang, Cai, and Small (2016)             
 ### Maintainer: Hyunseung Kang
-### E-mail: hskang@stanford.edu
+### E-mail: hyunseung@stat.wisc.edu
 
 ### TSHT
 ### FUNCTION: Point estimate, SE, and CI for treatment effect with invalid IVs 

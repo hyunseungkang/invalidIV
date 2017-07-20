@@ -16,7 +16,7 @@
 ###           and the link to the original code can be found here
 ###           https://web.stanford.edu/~montanar/sslasso/code.html
 ### Maintainer: Hyunseung Kang
-### E-mail: hskang@stanford.edu
+### E-mail: hyunseung@stat.wisc.edu
 
 
 # Authors: Hamid Javadi, Adel Javanmard, Andrea Montanari, Sven Schmit
