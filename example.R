@@ -40,12 +40,12 @@ confint(ivreg(Y ~ D + Z[,1:s]  | Z ))[2,]
 # above as sample size increases.
 
 # Output is a list that includes
-# beta: point estimate of the treatment effect
-# se: standard error of the beta
-# ci: 1 - alpha confidence interval for beta
-# V: estimated set of valid IVs
-# S: estimated set of relevant IVs
-TSHT.ldim(Y,D,Z)
+# VHat: estimated set of valid and relevant IVs
+# SHat: estimated set of relevant IVs
+# betaHat: point estimate of treatment effect
+# varHat: estimate of variance of betaHat
+# ci: 1-alpha confidence interval for treatment effect
+TSHT(Y,D,Z)
 
 
 
@@ -55,7 +55,7 @@ library(Matrix)
 library(glmnet)
 library(flare)
 
-### n = 100, pz = 300 IVs (s = 3 invalid, 10 relevant)
+### n = 500, pz = 600 IVs (s = 3 invalid, 10 relevant)
 # Y: n by 1 vector of outcomes (must be continuous)
 # D: n by 1 vector of treatments (continuous or discrete)
 # Z: n by pz vector of instruments (continuous or discrete)
@@ -63,7 +63,7 @@ library(flare)
 
 # Create data #
 library(MASS)
-n = 100; L = 300; s = 3; nRelevant = 10
+n = 500; L = 600; s = 3; nRelevant = 10
 alpha = c(rep(3,s),rep(0,L-s)); beta = 1; gamma = c(rep(1,nRelevant),rep(0,L-nRelevant))
 epsilonSigma = matrix(c(1,0.8,0.8,1),2,2)
 Z = matrix(rnorm(n*L),n,L)
@@ -88,9 +88,9 @@ confint(ivreg(Y ~ D + Z[,1:s]  | Z[,1:nRelevant] ))[2,]
 # above as sample size increases.
 
 # Output is a list that includes
-# beta: point estimate of the treatment effect
-# se: standard error of the beta
-# ci: 1 - alpha confidence interval for beta
-# V: estimated set of valid IVs
-# S: estimated set of relevant IVs
-TSHT.hdim(Y,D,Z)
+# VHat: estimated set of valid and relevant IVs
+# SHat: estimated set of relevant IVs
+# betaHat: point estimate of treatment effect
+# varHat: estimate of variance of betaHat
+# ci: 1-alpha confidence interval for treatment effect
+TSHT(Y,D,Z,method="DeLasso")
