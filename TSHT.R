@@ -2,108 +2,60 @@
 ### Function: Implements the two-stage hard thresholing
 ###           procedure for estimation and inference of 
 ###           treatment effects in the presence of invalid IVs
-###           as developed in Guo, Kang, Cai, and Small (2016)             
+###           as developed in Guo, Kang, Cai, and Small (2017)             
 ### Maintainer: Hyunseung Kang
 ### E-mail: hskang@stanford.edu
 
-### InputCheck
-### FUNCTION: checks the input for TSHT() to make sure they are properly
-###           formatted. This is an alternative to the model.matrix()
-###           command.
-### INPUT: Y, continuous outcome vector (u by 1 vector)
-###        D, continuous or discrete treatment vector (n by 1 vector)
-###        Z, continuous or discrete instrument matrix containing p_z 
-###           instruments (n by p_z matrix)
-###        X, optional continuous or discrete matrix containing p_x 
-###           covariates (n by p_x matrix)
-### OUTPUT: a list containing
-###           Y, a numeric outcome vector (n by 1 vector)
-###           D, a numeric treatment vector (n by 1 vector)
-###           Z, a numeric instrument matrix containing p_z instruments
-###              (n by p_z matrix)
-###           X, a numeric covariate matrix containing p_x
-###              covariates (n by p_x matrix). 
-###              If X is missing, a NULL value is returned.
-InputCheck <- function(Y,D,Z,X) {
-  # Check Y
-  stopifnot(missing(Y),(is.numeric(Y) || is.logical(Y)))
-  if((is.matrix(Y) || is.data.frame(Y)) & ncol(Y) > 1) stop("Y must be a vector!")
-  Y = as.numeric(Y)
-  Y.NAorNANindex = (is.na(Y) | is.nan(Y))
-  
-  # Check D
-  stopifnot(missing(D),(is.numeric(D) || is.logical(D) || is.character(D)))
-  if((is.matrix(D) || is.data.frame(D)) & ncol(D) > 1) stop("D must be a vector!")
-  if(is.character(D) || is.factor(D)) {
-    print("Treatment vector is factor or character-type. 
-          Checking to see if there are only two unique character values.")
-    tempD = factor(D)
-    if(nlevels(tempD) != 2) {
-      stop("There aren't two unique values!")
-    } else{
-      print("There are two unique values. Converting them to a binary vector...")
-      print(paste("--->",levels(tempD)[1],"is assigned 0"))
-      print(paste("--->",levels(tempD)[2],"is assigned 1"))
-      D = as.numeric(tempD) - 1
-    }
-  } 
-  D = as.numeric(D)
-  D.NAorNANindex = (is.na(D) | is.nan(D))
-  
-  if(missing(X)) {
-    return(list(Y =Y,D=D,Z=Z,X=NULL))
-  } else{
-    return(list(Y =Y,D=D,Z=Z,X=X))
-  }
-}
-
-
 ### TSHT
 ### FUNCTION: Point estimate, SE, and CI for treatment effect with invalid IVs 
-###           with individual-level data using 
-###           two-stage hard thresholding (TSHT)
-### INPUT: Y, continuous, numeric outcome vector (u by 1 vector)
-###        D, continuous or discrete, numeric treatment vector (n by 1 vector)
-###        Z, continuous or discrete, numeric instrument matrix containing p_z 
+###           using a single-sample, individual-level data via TSHT. 
+### INPUT: Y, continuous, non-missing, numeric outcome vector (u by 1 vector)
+###        D, continuous or discrete, non-missing, numeric treatment vector (n by 1 vector)
+###        Z, continuous or discrete, non-missing, numeric instrument matrix containing p_z 
 ###           instruments (n by p_z matrix)
-###        X, optional continuous or discrete, numeric matrix containing p_x 
+###        X, optional continuous or discrete, non-missing, numeric matrix containing p_x 
 ###           covariates (n by p_x matrix)
-###        intercept, should the intercept term be included? 
-###                   (TRUE/FALSE)
-###        alpha, a numeric value indicating the significance level for 
-###               the confidence interval
-###        tuning, a numeric value tuning parameter for TSHT greater 
-###                than 2
-###        ..., additional arguments to be passed to SSLasso and USolver
-###             in JMCode.r
-### OUTPUT: a list (a) beta (scalar numeric value:
+###        intercept, a boolean scalar asking "should the intercept term be included?" 
+###                   with TRUE/FALSE (default = TRUE)
+###        alpha, a numeric scalar value between 0 and 1 indicating the significance level for 
+###               the confidence interval (default = 0.05)
+###        tuning, a numeric scalar value tuning parameter for TSHT greater 
+###                than 2 (default = 2.01)
+###        method, a character scalar declaring the method used to estimate the inputs in TSHT
+###                (default = "OLS")
+### OUTPUT: a list (a) VHat (numeric vector denoting the set of valid and relevant IVs)
+###                (b) SHat (numeric vector denoting the set of relevant IVs)
+###                (c) betaHat (scalar numeric value:
 ###                             the estimate of the treatment effect)
-###                (b) se (scalar numeric value:
-###                           the standard error of beta)
-###                (c) p-value (scalar numeric value:
-###                           p-value of no treatment effect for beta)
-###                (d) ci (two dimensional vector, 
+###                (d) varHat (scalar numeric value:
+###                            estimated variance of betaHat)
+###                (e) ci (two dimensional vector, 
 ###                           the 1-alpha confidence interval for beta
 ###                           with the lower and upper endpoints)
-###                (e) V (numeric vector denoting the set of valid and relevant IVs)
-###                (f) S (numeric vector denoting the set of relevant IVs)
-TSHT <- function(Y,D,Z,X,intercept=TRUE,alpha=0.05,tuning=2.01,method=c("OLS","DeLasso"),...) {
+TSHT <- function(Y,D,Z,X,intercept=TRUE,alpha=0.05,tuning=2.01,method=c("OLS","DeLasso")) {
   # Check and Clean Input Type #
   # Check Y
   stopifnot(!missing(Y),(is.numeric(Y) || is.logical(Y)),(is.matrix(Y) || is.data.frame(Y)) && ncol(Y) == 1)
+  stopifnot(all(!is.na(Y)))
   Y = as.numeric(Y)
   
   # Check D
   stopifnot(!missing(D),(is.numeric(D) || is.logical(D)),(is.matrix(D) || is.data.frame(D)) && ncol(D) == 1)
+  stopifnot(all(!is.na(D)))
   D = as.numeric(D)
 
   # Check Z
   stopifnot(!missing(Z),(is.numeric(Z) || is.logical(Z)),is.matrix(Z))
+  stopifnot(all(!is.na(Z)))
+
+  # Check dimesions
   stopifnot(length(Y) == length(D), length(Y) == nrow(Z))
 
   # Check X, if present
   if(!missing(X)) {
-    stopifnot((is.numeric(X) || is.logical(X)),is.matrix(X),nrow(Y) == nrow(X))
+    stopifnot((is.numeric(X) || is.logical(X)),is.matrix(X) && nrow(X) == nrow(Z))
+    stopifnot(all(!is.na(X)))
+
     W = cbind(Z,X)
   } else {
     W = Z
@@ -111,42 +63,53 @@ TSHT <- function(Y,D,Z,X,intercept=TRUE,alpha=0.05,tuning=2.01,method=c("OLS","D
 
   # All the other argument
   stopifnot(is.logical(intercept))
-  stopifnot(is.numeric(alpha),length(alpha) != 1,alpha <= 1,alpha >= 0)
-  stopifnot(is.numeric(tuning),length(tuning) != 1, tuning >=2)
+  stopifnot(is.numeric(alpha),length(alpha) == 1,alpha <= 1,alpha >= 0)
+  stopifnot(is.numeric(tuning),length(tuning) == 1, tuning >=2)
   stopifnot(is.character(method))
 
   # Derive Inputs for TSHT
   n = length(Y); pz=ncol(Z)
   if(method[1] == "OLS") {
     inputs = TSHT.OLS(Y,D,W,pz,intercept)
+    A = t(inputs$WUMat) %*% inputs$WUMat / n
   } else{
     inputs = TSHT.DeLasso(Y,D,W,pz,intercept)
+    A = diag(pz)
   }
 
-  return(TSHT.helper(ITT_Y = inputs$ITT_Y,ITT_D = inputs$ITT_D,
-                     SigmaSqD = inputs$SigmaSqD,SigmaSqY = inputs$SigmaSqY,SigmaYD=inputs$SigmaYD,
-                     covW = covW,WUMat = WUMat,
-                     weightedBeta=FALSE,alpha=alpha,tuning=tuning)
+  # Estimate Valid IVs
+  SetHats = TSHT.VHat(ITT_Y = inputs$ITT_Y,ITT_D = inputs$ITT_D,WUMat = inputs$WUMat,
+                      SigmaSqD = inputs$SigmaSqD,SigmaSqY = inputs$SigmaSqY,SigmaYD=inputs$SigmaYD,tuning=tuning)
+  VHat = SetHats$VHat; SHat = SetHats$SHat
 
+  # Obtain point est, se, and ci
+  AVHat = solve(A[VHat,VHat])
+  betaHat = (t(inputs$ITT_Y[VHat]) %*% AVHat %*% inputs$ITT_D[VHat]) / (t(inputs$ITT_D[VHat]) %*% AVHat %*% inputs$ITT_D[VHat])
+  SigmaSq = inputs$SigmaSqY + betaHat^2 * inputs$SigmaSqD - 2*betaHat * inputs$SigmaYD
+  betaVarHat = SigmaSq * (t(inputs$ITT_D[VHat]) %*% AVHat %*% (t(inputs$WUMat) %*% inputs$WUMat/ n)[VHat,VHat] %*% AVHat %*% inputs$ITT_D[VHat]) / (t(inputs$ITT_D[VHat]) %*% AVHat %*% inputs$ITT_D[VHat])^2
+  ci = c(betaHat - qnorm(1-alpha/2) * sqrt(betaVarHat / n),betaHat + qnorm(1-alpha/2) * sqrt(betaVarHat/n))
+
+  return(list(VHat = VHat,SHat=SHat,betaHat=betaHat,betaVarHat = betaVarHat,ci=ci))
 }
 
 TSHT.OLS <- function(Y,D,W,pz,intercept=TRUE) {
   # Include intercept
   if(intercept) {
     W = cbind(W,1)
-  } 
+  }
+  p = ncol(W) 
   
   # Compute covariance of W and W %*% U
-  covW = t(W) %*% W /n
+  covW = t(W) %*% W /n #this should automatically turn covW into a matrix
   WUMat = W %*% (solve(covW))[,1:pz]
   
   # First Part (OLS Estimation)
   qrW = qr(W)
   ITT_Y = qr.coef(qrW,Y)[1:pz]
   ITT_D = qr.coef(qrW,D)[1:pz]
-  SigmaSqY = sum(qr.resid(qrW,Y)^2)/n
-  SigmaSqD = sum(qr.resid(qrW,D)^2)/n
-  SigmaYD = sum(qr.resid(qrW,Y) * qr.resid(qrW,D)) / n
+  SigmaSqY = sum(qr.resid(qrW,Y)^2)/(n -p)
+  SigmaSqD = sum(qr.resid(qrW,D)^2)/(n -p)
+  SigmaYD = sum(qr.resid(qrW,Y) * qr.resid(qrW,D)) / (n - p)
 
   return(list(ITT_Y = ITT_Y,ITT_D = ITT_D,WUMat = WUMat,SigmaSqY = SigmaSqY,SigmaSqD = SigmaSqD,SigmaYD = SigmaYD))
 }
@@ -166,229 +129,80 @@ TSHT.DeLasso <- function(Y,D,W,pz,intercept=TRUE) {
   return(list(ITT_Y = ITT_Y,ITT_D = ITT_D,WUMat = WUMat,SigmaSqY = SigmaSqY,SigmaSqD = SigmaSqD,SigmaYD = SigmaYD))
 }
 
-### TSHT.hdim
-### Function: Point estimate and CI for treatment effect with invalid IVs ###
-###           using individual-level data                                 ###
-### Input: Y, continuous outcome (n by 1 vector)
-###        D, continuous or discrete treatment (n by 1 vector)
-###        Z, continuous or discrete instrument matrix containing p_z 
-###           instruments (n by p_z matrix)
-###        X, optional continuous or discrete covariate matrix containing 
-###           p_x covarites (n by p_x matrix)
-###        intercept, should the intercept term be included? (TRUE)
-###        alpha, a numeric value indicating the significance level for 
-###               confidence interval
-###        tuning, a constant value greater than 2
-### Output: a list of (a) beta (scalar numeric value:
-###                             the estimate of the treatment effect)
-###                   (b) se (scalar numeric value:
-###                           the standard error of beta)
-###                   (c) ci (two dimensional vector, 
-###                           the 1-alpha confidence interval for beta
-###                           with the lower and upper endpoints)
-###                   (d) V (numeric vector denoting the set of valid and relevant IVs)
-###                   (e) S (numeric vector denoting the set of relevant IVs)
-TSHT.hdim <- function(Y,D,Z,X,intercept=TRUE,alpha=0.05,tuning=2.01){
+
+### TSHT.VHat
+### FUNCTION: Estimates the set of valid and relevant IVs
+### INPUT: ITT_Y: a numeric, non-missing vector estimating each instrument's effect on the outcome
+###        ITT_D: a numeric, non-missing vector estimating each instrument's effect on the treatment
+###        WUMat: an n by pz numeric, non-missing matrix that computes the precision of W 
+###               (ex1 t(WUMat) %*% WUMat / n = (W^T W/n)^(-1))
+###               (ex2 U = (W^T W/n)^(-1))
+###        SigmaSqY: a numeric, non-missing, positive scalar value estimating the 
+###                  error variance of Y in the reduced-form model of Y
+###        SigmaSqD: a numeric, non-missing, positive scalar value estimating the 
+###                  error variance of D in the reduced-form model of D
+###        SigmaYD: a numeric, non-missing, scalar value estimating the covariance
+###                 of the error terms in the reduced-form models of Y and D
+###        tuning, a numeric scalar value tuning parameter for TSHT greater 
+###                than 2 (default = 2.01)
+### OUTPUT: a list (a) VHat (numeric vector denoting the set of valid and relevant IVs)
+###                (b) SHat (numeric vector denoting the set of relevant IVs)
+TSHT.VHat <- function(ITT_Y,ITT_D,WUMat,SigmaSqY,SigmaSqD,SigmaYD,tuning = 2.01) {
+  # Check ITT_Y and ITT_D
+  stopifnot(!missing(ITT_Y),!missing(ITT_D),length(ITT_Y) == length(ITT_D))
+  stopifnot(all(!is.na(ITT_Y)),all(!is.na(ITT_D)))
+  ITT_Y = as.numeric(ITT_Y); ITT_D = as.numeric(ITT_D)
+  
+  # Check WUMat
+  stopifnot(!missing(WUMat),is.matrix(WUMat), nrow(WUMat) > 1, ncol(WUMat) == length(ITT_Y)) 
+  stopifnot(all(!is.na(WUMat)))
+
+  # Check Sigmas 
+  stopifnot(!missing(SigmaSqY), is.numeric(SigmaSqY), length(SigmaSqY) == 1, !is.na(SigmaSqY), SigmaSqY > 0)
+  stopifnot(!missing(SigmaSqD), is.numeric(SigmaSqD), length(SigmaSqD) == 1, !is.na(SigmaSqD),SigmaSqD > 0)
+  stopifnot(!missing(SigmaYD),is.numeric(SigmaYD), length(SigmaYD) == 1,!is.na(SigmaYD))
+
+  # Other Input check
+  stopifnot(is.numeric(tuning),length(tuning) == 1, tuning >=2)
+
   # Constants
-  n = length(Y); pz=ncol(Z)
-  
-  # Setting Up W Matrix
-  if(missing(X)) {
-    W = Z
-  } else{
-    W = cbind(Z,X)
-  }
-  p = ncol(W)
-  
-  # Fit Reduced-Form Model for Y and D
-  model_Y <- SSLasso(X=W,y=Y,intercept=intercept,verbose=FALSE)
-  model_D = SSLasso(X=W,y=D,intercept=intercept,verbose=FALSE) 
-  ITT_Y = model_Y$unb.coef[1:(pz)]
-  ITT_D = model_D$unb.coef[1:(pz)]
-  resid_Y = model_Y$resid.lasso; resid_D = model_D$resid.lasso
-  SigmaSqY=sum(resid_Y^2)/n
-  SigmaSqD=sum(resid_D^2)/n
-  SigmaYD =sum(resid_Y * resid_D)/n
-  
-  WUMat = model_D$WUMat
-  if(intercept) {
-    W = cbind(W,1)
-    covW = t(W) %*% W/n
-  } else{
-    covW = t(W) %*% W/n
-  }
-  
-  return(TSHT.helper(ITT_Y = ITT_Y,ITT_D = ITT_D,
-                     SigmaSqD = SigmaSqD,SigmaSqY = SigmaSqY,SigmaYD=SigmaYD,
-                     covW = covW,WUMat = WUMat,
-                     weightedBeta=FALSE,alpha=alpha,tuning=tuning))
-}
-
-### TSHT.ldim
-### Function: Point estimate and CI for treatment effect with invalid IVs ###
-###           using individual-level data                                 ###
-### Input: Y, continuous outcome (n by 1 vector)
-###        D, continuous or discrete treatment (n by 1 vector)
-###        Z, continuous or discrete instrument matrix containing p_z 
-###           instruments (n by p_z matrix)
-###        X, optional continous or discrete covariate matrix containing 
-###           p_x covarites (n by p_x matrix)
-###        intercept, should the intercept term be included? (TRUE)
-###        alpha, a numeric value indicating the significance level for 
-###               confidence interval
-###        tuning, a constant value greater than 2
-### Output: a list of (a) beta (scalar numeric value:
-###                             the estimate of the treatment effect)
-###                   (b) se (scalar numeric value:
-###                           the standard error of beta)
-###                   (c) ci (two dimensional vector, 
-###                           the 1-alpha confidence interval for beta
-###                           with the lower and upper endpoints)
-###                   (d) V (numeric vector denoting the set of valid and relevant IVs)
-###                   (e) S (numeric vector denoting the set of relevant IVs)
-TSHT.ldim <- function(Y,D,Z,X,intercept=TRUE,alpha=0.05,tuning=2.01) {
-  # Constants
-  n = length(Y); pz=ncol(Z)
-  
-  # Setting Up W Matrix
-  if(missing(X)) {
-    W = Z
-  } else{
-    W = cbind(Z,X)
-  }
-  p = ncol(W)
-  
-  # Include intercept
-  if(intercept) {
-    W = cbind(W,1)
-  } 
-  
-  # Compute covariance of W and W %*% U
-  covW = t(W) %*% W /n
-  WUMat = W %*% (solve(covW))[,1:p]
-  
-  # First Part (OLS Estimation)
-  qrW = qr(W)
-  ITT_Y = qr.coef(qrW,Y)[1:pz]
-  ITT_D = qr.coef(qrW,D)[1:pz]
-  SigmaSqY = sum(qr.resid(qrW,Y)^2)/n
-  SigmaSqD = sum(qr.resid(qrW,D)^2)/n
-  SigmaYD = sum(qr.resid(qrW,Y) * qr.resid(qrW,D)) / n
-
-  # Second Part (Invalid IV Estimation)
-  TSHT.helper(ITT_Y = ITT_Y,ITT_D = ITT_D,
-              SigmaSqD = SigmaSqD,SigmaSqY = SigmaSqY,SigmaYD=SigmaYD,
-              covW = covW,WUMat = WUMat,weightedBeta = TRUE,alpha=alpha,tuning=tuning)
-}
-
-### TSHT.helper
-### Function: Point estimate and CI for treatment effect with invalid IVs ###
-###           using summary statistics 
-### Input: ITT_Y, a p_z by 1 vector of estimated values of each IV's 
-###               effect on the outcome
-###        ITT_D, a p_z by 1 vector of estimated values of each IV's 
-###               effect on the treatment
-###        SigmaSqD, a positive scalar value of the estimated 
-###               variance of the treatment
-###        SigmaSqY, a positive scalar value of the estimated 
-###               variance of the outcome
-###        SigmaYD, a positive scalar value of the estimated 
-###                 covariance between the outcome and treatment
-###        covW, estimmate of E(W^T W), used for weighting beta 
-###        WUMat, the matrix W %*% U in the thresholding procedure.
-###        weightedBeta, should we weigh the beta? Only applies to case where n > p and covW is provided
-###        alpha, a numeric value indicating the significance level for 
-###               confidence interval
-###        tuning, a constant value greater than 2
-### Output: a list of (a) beta (scalar numeric value:
-###                             the estimate of the treatment effect)
-###                   (b) se (scalar numeric value:
-###                           the standard error of beta)
-###                   (c) ci (two dimensional vector, 
-###                           the 1-alpha confidence interval for beta
-###                           with the lower and upper endpoints)
-###                   (d) V (numeric vector denoting the set of valid and relevant IVs)
-###                   (e) S (numeric vector denoting the set of relevant IVs)
-TSHT.helper <- function(ITT_Y,ITT_D,
-                        SigmaSqD,SigmaSqY,SigmaYD,
-                        covW,WUMat,
-                        weightedBeta = FALSE,alpha=0.05,tuning=2.01) {
-  n = nrow(WUMat)
-  pz = length(ITT_Y)
+  n = nrow(WUMat); pz = length(ITT_Y)
   
   # First Stage
-  Stilde = (1:length(ITT_D))[abs(ITT_D) >= (sqrt(SigmaSqD) * sqrt(colSums(WUMat^2)/n) * sqrt(tuning*log(max(pz,n))/n))]
-  if(length(Stilde) == 0) {
-    print("The IVs are individually weak and TSHT using these IVs will give misleading CIs, SEs, and p-values.")
-    response = readline("Proceed anyway treating all the IVs as strong (yes/no)?: ")
-    if(response == "yes") {
-      Stilde = 1:length(ITT_D)
-      print("Again, please be cautious interpreting the CIs, SEs, and p-values...")
-    }
+  SHat = (1:pz)[(abs(ITT_D) >= (sqrt(SigmaSqD * colSums(WUMat^2) /n) * sqrt(tuning*log(pz)/n)))]
+  if(length(SHat) == 0) {
+    warning("First Thresholding Warning: IVs individually weak. TSHT with these IVs will give misleading CIs, SEs, and p-values. Use more robust methods.")
+    warning("Defaulting to treating all IVs as strong.")
+    SHat= 1:pz
   }
-  suppgamma = rep(FALSE,length(ITT_D))
-  suppgamma[Stilde] = TRUE
-  
+  SHat.bool = rep(FALSE,pz); SHat.bool[SHat] = TRUE
+
   # Second Stage
   # pi.candidate is the estimated value of pi across different candidates
-  pi.candidate = matrix(0,length(ITT_Y),length(Stilde)) 
-  for(i in 1:length(Stilde)) {
-    j = Stilde[i]
-    betaj = ITT_Y[j] / ITT_D[j]
-    pi.candidate.noHT = ITT_Y - ITT_D * betaj #HT stands for hard thresholding
-    sigmaSq.candidate = SigmaSqY + betaj^2 * SigmaSqD - 2*betaj*SigmaYD
-	  pi.candidate.HT.index = (1:length(ITT_Y))[suppgamma & #this line here essentially does k \in Stilde in our paper
-	                                            (abs(pi.candidate.noHT) >= tuning * sqrt(sigmaSq.candidate) * 
-	                                              sqrt(colSums( (WUMat - outer(WUMat[,j]/ITT_D[j], ITT_D))^2)/n) *
-                                                sqrt(log(max(pz,n))/n))]
-    pi.candidate[pi.candidate.HT.index,i] = pi.candidate.noHT[pi.candidate.HT.index]
+  nCand = length(SHat)
+  VHats.bool = matrix(FALSE,nCand,nCand); colnames(VHats.bool) = rownames(VHats.bool) = SHat
+  for(j in SHat) {
+    beta.j = ITT_Y[j] / ITT_D[j]
+    pi.j = ITT_Y - ITT_D * beta.j
+    sigmasq.j = SigmaSqY + beta.j^2 * SigmaSqD - 2* beta.j * SigmaYD
+    PHat.bool.j = abs(pi.j) <= sqrt(sigmasq.j * colSums( (WUMat - outer(WUMat[,j]/ITT_D[j], ITT_D))^2)/n) * 
+                          sqrt(tuning^2 * log(pz)/n)
+    VHat.bool.j = PHat.bool.j * SHat.bool
+    VHats.bool[as.character(SHat),as.character(j)] = VHat.bool.j[SHat]
   }
-  
-  # L0 Penalization
-  pi.candidate.l0 = colSums(abs(pi.candidate) > 0) #The inner operation doesn't turn abs(pi.candidate) > 0 into a vector.
-  jstar = which(min(pi.candidate.l0) == pi.candidate.l0)
-  if(length(jstar) > 1) {
-    # L1 Penalization if non-unique form exists
-    pi.candidate.l1 = colSums(abs(pi.candidate[,jstar]))
-    minL1amongNonUniqueL0 = which(min(pi.candidate.l1) == pi.candidate.l1) 
-    jstar = jstar[minL1amongNonUniqueL0]
-    if(length(jstar) > 1) jstar = jstar[1] #If it's still non-unique, we just choose the first one.
+
+  # Voting
+  VM = rowSums(VHats.bool)
+  VM.m = rownames(VHats.bool)[VM > (0.5 * length(SHat))] # Majority winners
+  VM.p = rownames(VHats.bool)[max(VM) == VM] #Plurality winners
+  VHat = as.numeric(union(VM.m,VM.p))
+
+  # Error check
+  if(length(VHat) == 0){
+    warning("VHat Warning: No valid IVs estimated. This may be due to weak IVs or identification condition not being met. Use more robust methods.")
+    warning("Defaulting to all IVs being valid")
+    VHat = 1:pz
   }
-  
-  # Estimated support of pi 
-  supppi = which(abs(pi.candidate[,jstar]) > 0) 
-  
-  # Vtilde and Aweight
-  Vtilde = setdiff(Stilde,supppi) #this is a setminus operation with Stilde \setminus supp(Pi)
-  if((ncol(covW) < (n/10) || weightedBeta) && !missing(covW)) {
-    VtildeComplement = setdiff(1:ncol(covW),Vtilde) #Remember, there can be an intercept in covW and the intercept term
-                                                    #is always the last term of W
-    if(length(VtildeComplement) == 0) {
-      Aweight = covW[Vtilde,Vtilde]
-    } else{
-      Aweight = covW[Vtilde,Vtilde] - 
-                (covW[Vtilde,VtildeComplement,drop=FALSE] %*% 
-                (solve(covW[VtildeComplement,VtildeComplement])) %*% 
-                covW[VtildeComplement,Vtilde,drop=FALSE])
-    }
-    commonDenom = (t(ITT_D[Vtilde]) %*% Aweight %*% ITT_D[Vtilde])
-    
-    ### betaE, standard error, and conf int.
-    betaE = (t(ITT_D[Vtilde]) %*% Aweight %*% ITT_Y[Vtilde]) / commonDenom
-    sigmaSq = SigmaSqY + betaE^2 * SigmaSqD - 2*betaE*SigmaYD
-    V = sigmaSq / commonDenom
-    confInt = c(betaE - qnorm(1-alpha/2) * sqrt(V/n),betaE + qnorm(1-alpha/2) * sqrt(V/n))
-    return(list(beta=betaE,se = sqrt(V/n),ci = confInt,V=Vtilde,S = Stilde))  
-  } else {
-    commonDenom = sum(ITT_D[Vtilde]^2)
-    
-    ### General beta estimator betaG
-    betaG = sum(ITT_D[Vtilde] * ITT_Y[Vtilde]) / commonDenom
-    sigmaSq = SigmaSqY + betaG^2 * SigmaSqD - 2*betaG*SigmaYD
-    V = sigmaSq *
-         sum((WUMat[,Vtilde] %*% ITT_D[Vtilde] / sqrt(n))^2) / (commonDenom)^2
-    confInt = c(betaG - qnorm(1-alpha/2) * sqrt(V/n),betaG + qnorm(1-alpha/2) * sqrt(V/n))
-    return(list(beta=betaG,se = sqrt(V/n),ci = confInt,V=Vtilde,S = Stilde))
-  }
-}
-  
+
+  return(list(VHat = VHat,SHat=SHat))
+}  
