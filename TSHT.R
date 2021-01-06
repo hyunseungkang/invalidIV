@@ -187,6 +187,7 @@ TSHT.VHat <- function(ITT_Y,ITT_D,WUMat,SigmaSqY,SigmaSqD,SigmaYD,tuning = 2.01)
     sigmasq.j = SigmaSqY + beta.j^2 * SigmaSqD - 2* beta.j * SigmaYD
     PHat.bool.j = abs(pi.j) <= sqrt(sigmasq.j * colSums( (WUMat - outer(WUMat[,j]/ITT_D[j], ITT_D))^2)/n) * 
                           sqrt(tuning^2 * log(pz)/n)
+    PHat.bool.j[j] = TRUE  # instrument is always consistent with itself
     VHat.bool.j = PHat.bool.j * SHat.bool
     VHats.bool[as.character(SHat),as.character(j)] = VHat.bool.j[SHat]
   }
