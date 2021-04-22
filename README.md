@@ -114,6 +114,5 @@ TSHT(Y,D,Z,method="DeLasso")
 ```
 
 ## References 
-Guo, Z., Kang, H., Cai, T. T., and Small, D. S. (2016). <a href="https://arxiv.org/abs/1603.05224">Confidence Interval for Causal Effects with Invalid Instruments using Two-Stage Hard Thresholding with Voting.</a> Technical Report.
+Guo, Z., Kang, H., Cai, T. T., and Small, D. S. (2018). <a href="https://arxiv.org/abs/1603.05224">Confidence Interval for Causal Effects with Invalid Instruments using Two-Stage Hard Thresholding with Voting.</a> Journal of the Royal Statistical Society: Series B (Statistical Methodology. 80:4. 793-815.
 
-Kang, H., Cai, T. T., Small, D. S. (2016). <a href="http://arxiv.org/abs/1504.03718">A Simple and Robust Confidence Interval for Causal Effects with Possibly Invalid Instruments.</a> Technical Report.
